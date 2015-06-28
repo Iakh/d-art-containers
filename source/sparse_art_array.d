@@ -17,7 +17,7 @@ struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
     alias Elem = T;
 
 static:
-    ref Elem opIndex(ref Node* root, ref ubyte[depth] key)
+    ref Elem opIndex(ref Node* root, in ubyte[depth] key)
     {
         static string nodeAddSwitchBuilder()
         {
@@ -163,7 +163,7 @@ static:
         }
     }
 
-    private Elem* get(Node* current, ref ubyte[depth] key)
+    private Elem* get(Node* current, ref ubyte[depth] key) // TODO: unittests
     {
         static string nodeGetSwitchBuilder()
         {
@@ -226,19 +226,19 @@ static:
 }
 
 // Fixed langth key
-struct SparseArray(T, KeyType = ubyte[8]) // TODO: integral key
+struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
 {
     alias Elem = T;
-    alias ArrayNodeManager = NodeManager!(NodeTypes, LeafTypes, Elem, KeyType.length);
+    alias ArrayNodeManager = NodeManager!(NodeTypes, LeafTypes, Elem, bytesUsed);
 
     ref Elem opIndex(ref KeyType key)
     {
-        return ArrayNodeManager.opIndex(m_root, key);
+        return ArrayNodeManager.opIndex(m_root, key.byUBytes!bytesUsed);
     }
 
-    Elem* opBinaryRight(string op)(Elem e) if (op == "in")
+    Elem* opBinaryRight(string op)(ref KeyType key) if (op == "in")
     {
-        return null;
+        return ArrayNodeManager.get(m_root, key.byUBytes!bytesUsed);
     }
 private:
     alias NodeTypes = TypeList!(Node4, Node256);
@@ -251,26 +251,26 @@ unittest
 {
     import std.stdio;
     stderr.writeln("aparse-arr test");
-    alias KeyType = ubyte[2];
-    SparseArray!(int, KeyType) arr;
+    alias KeyType = size_t;
+    SparseArray!(int, KeyType, 2) arr;
     stderr.writeln("aparse-arr test");
-    KeyType i = [0, 0];
+    KeyType i = 0;
     arr[i] = 5;
     assert(arr[i] == 5);
 
-    KeyType j = [0, 0];
+    KeyType j = 0;
 
     stderr.writeln("aparse-arr test");
     foreach (ubyte k; 0 .. 256)
     {
-        j[1] = k;
+        j = k;
         arr[j] = k;
         assert(arr[j] == k);
     }
 
     foreach (ubyte k; 0 .. 256)
     {
-        j[0] = k;
+        j = k * 256;
         arr[j] = k;
         assert(arr[j] == k);
     }

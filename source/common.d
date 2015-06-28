@@ -28,6 +28,7 @@ auto virtualCall(string method, alias ChildrenTL, T, U...)(T* obj, U args)
     {
         mixin(virtualCallSwtichBuilder());
         default: assert(false, "Object should be one of @param Children types.");
+
     }
 }
 
@@ -79,3 +80,25 @@ PrototypeT* toBase(PrototypeT, ChildT)(ref ChildT child)
     mixin(toBaseT!());
 }
 
+ubyte[bytesUsed] byUBytes(size_t bytesUsed, TInt)(TInt val)
+{
+    assert(bytesUsed < TInt.sizeof);
+    assert(val < 2 ^^ (bytesUsed * 8));
+
+    struct ReinterpretAsUByte
+    {
+        union
+        {
+            TInt v;
+            ubyte[bytesUsed] arr;
+        }
+    }
+
+    ReinterpretAsUByte tmp;
+    tmp.v = val;
+
+    import std.algorithm : reverse;
+    reverse(tmp.arr[]);
+
+    return tmp.arr;
+}
