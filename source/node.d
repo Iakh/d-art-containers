@@ -29,12 +29,13 @@ struct Node
         ubyte[3] m_align;
     }
 
+    Node* m_parent;
 }
 
 unittest
 {
-    static assert(Node.sizeof == 4);
-    static assert(Node.sizeof + Node4.Capacity * (ubyte.sizeof + (Node*).sizeof) == Node4.sizeof);
+    static assert(Node.sizeof == 16);
+    static assert(Node.sizeof + Node4.Capacity * (ubyte.sizeof + (Node*).sizeof) + 4 == Node4.sizeof);
 
     Node4 node4;
     node4.m_size = 4;
@@ -80,8 +81,6 @@ private size_t search(T, size_t N)(ref T[N] arr, T element, size_t size)
 
     for (; min < max; mid = (min + max) / 2)
     {
-        import std.stdio;
-        stderr.writeln("search min:" ~ min.to!string ~ " max:"  ~ max.to!string);
         if (arr[mid] < element)
         {
             min = mid + 1;
@@ -129,14 +128,16 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
         {
             m_keys[n] = cast(byte)i;
             m_nodes[n] = v;
+            static if (is(ChildT == Node*))
+            {
+                m_nodes[n].m_parent = this.toNode;
+            }
             ++n;
         }
     }
 
     auto opIndex()
     {
-        import std.stdio;
-        stderr.writeln(m_type.to!string ~ ".[] keys:" ~ m_keys.to!string);
         return zip(m_keys[], m_nodes[]).takeExactly(m_size);
     }
 
@@ -152,22 +153,23 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
             m_nodes.insertInPlace(pos, child, m_size);
             ++m_size;
 
-            import std.stdio;
-            stderr.writeln(m_type.to!string ~ ".addChild key:" ~ key.to!string ~ ".addChild size:"  ~ m_size.to!string);
+            static if (is(ChildT == Node*))
+            {
+                child.m_parent = this.toNode;
+            }
 
             return this.toNode;
         }
         else
         {
             auto newThis = new MajorNode(this[]);
+            newThis.m_parent = m_parent;
             return newThis.addChild!MajorNode(key, child);
         }
     }
 
     ChildT* get(ubyte key)
     {
-        import std.stdio;
-        stderr.writeln(m_type.to!string ~ ".get key:" ~ key.to!string ~ " size:"  ~ m_size.to!string);
         size_t pos = m_keys.search(key, m_size);
 
         if (pos < m_size && m_keys[pos] == key)
@@ -202,6 +204,34 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
         m_size = 0;
     }
 
+public /+Iteration+/
+{
+    bool isEnd(int innerIndex)
+    {
+        return innerIndex >= m_size;
+    }
+
+    int next(int innerIndex)
+    {
+        return innerIndex + 1;
+    }
+
+    int getFirstInnerIndex()
+    {
+        return 0;
+    }
+
+    ChildT* getChildByInnerIndex(ubyte innerIndex)
+    {
+        return &m_nodes[innerIndex];
+    }
+
+    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    {
+        return m_keys[innerIndex];
+    }
+}
+
     Node m_prototype = type;
     alias  m_prototype this;
 
@@ -232,6 +262,7 @@ struct Node256
         foreach(i, val; r)
         {
             m_nodes[i] = val;
+            m_nodes[i].m_parent = this.toNode;
         }
     }
 
@@ -244,6 +275,7 @@ struct Node256
     {
         assert(m_nodes[key] == null, "Node[key] has to be free.");
 
+        child.m_parent = this.toNode;
         m_nodes[key] = child;
         ++m_size;
 
@@ -280,6 +312,40 @@ struct Node256
         m_size = 0;
     }
 
+public /+Iteration+/
+{
+    bool isEnd(int innerIndex)
+    {
+        return innerIndex == Capacity;
+    }
+
+    int next(int innerIndex)
+    {
+        do
+        {
+            ++innerIndex;
+        }
+        while(innerIndex < Capacity && m_nodes[innerIndex] == null);
+
+        return innerIndex;
+    }
+
+    int getFirstInnerIndex()
+    {
+        return next(-1);
+    }
+
+    Node** getChildByInnerIndex(ubyte innerIndex)
+    {
+        return &m_nodes[innerIndex];
+    }
+
+    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    {
+        return innerIndex;
+    }
+}
+
     Node m_prototype = NodeType.Node256;
     alias  m_prototype this;
 
@@ -289,76 +355,12 @@ struct Node256
 
 }
 
-struct StaticBitArray(size_t Size)
-{
-    enum ByteSize = (Size + 7) / 8;
-
-    struct Range
-    {
-        bool front()
-        {
-            return (*m_outer)[m_index];
-        }
-
-        void popFront()
-        {
-            ++m_index;
-        }
-
-        bool empty()
-        {
-            return m_index >= Size;
-        }
-
-        this(StaticBitArray* outer)
-        {
-            m_outer = outer;
-        }
-
-    private:
-        StaticBitArray* m_outer;
-        size_t m_index;
-    }
-
-    Range opIndex()
-    {
-        return Range(&this);
-    }
-
-    bool opIndex(size_t i)
-    {
-        assert(i >= 0 && i < Size); // TODO: throw OutOfRange
-        size_t nByte = (i >> 3);
-        size_t nBitMask = (1 << (i & 0b111));
-        import std.stdio;
-        stderr.writeln("BitArray.opIndex" ~ " i: " ~ (i & 0b111).to!string ~ " n: " ~ nByte.to!string ~ " bit " ~ nBitMask.to!string);
-        return cast(bool)(m_bytes[nByte] & nBitMask);
-    }
-
-    void opIndexAssign(bool value, size_t n)
-    {
-        assert(n >= 0 && n < Size); // TODO: throw OutOfRange
-        ulong i = (n >> 3);
-        byte bit = cast(byte)(1 << (n & 0b111));
-        byte x = value;
-
-        m_bytes[i] ^= (-x ^ m_bytes[i]) & bit;
-        import std.stdio;
-        stderr.writeln("BitArray.opIndexAssign" ~ " byte: " ~ m_bytes[i].to!string);
-    }
-
-private:
-    ubyte[ByteSize] m_bytes;
-}
-
 struct Leaf256(T)
 {
     this(Range)(Range r)
     {
         foreach(i, val; r)
         {
-            import std.stdio;
-            stderr.writeln(m_type.to!string ~ ".ctor key:" ~ i.to!string);
             m_mask[i] = true;
             m_nodes[i] = val;
             ++m_size;
@@ -372,14 +374,6 @@ struct Leaf256(T)
 
     Node* addChild(MajorNode)(ubyte key, T child)
     {
-        import std.stdio;
-        stderr.writeln(m_type.to!string ~ ".addChild key:" ~ key.to!string ~ ".addChild size:"  ~ m_size.to!string);
-        scope(exit) stderr.writeln(m_type.to!string ~ ".addChild END");
-        if (m_mask[key] == true)
-        {
-            import std.stdio;
-            stderr.writeln("[flase]" ~ m_type.to!string ~ " key: " ~ key.to!string);
-        }
         assert(m_mask[key] == false, "Node[key] has to be free.");
 
         m_mask[key] = true;
@@ -391,15 +385,11 @@ struct Leaf256(T)
 
     T* get(ubyte key)
     {
-        import std.stdio;
-        stderr.writeln(m_type.to!string ~ ".get key:" ~ key.to!string ~ ".addChild size:"  ~ m_size.to!string);
-        scope(exit) stderr.writeln(m_type.to!string ~ ".get END");
         if (!m_mask[key])
         {
             return null;
         }
 
-        stderr.writeln(m_type.to!string ~ ".get END not null");
         return &m_nodes[key];
     }
 
@@ -423,6 +413,40 @@ struct Leaf256(T)
 
         m_size = 0;
     }
+
+public /+Iteration+/
+{
+    bool isEnd(int innerIndex)
+    {
+        return innerIndex == Capacity;
+    }
+
+    int next(int innerIndex)
+    {
+        do
+        {
+            ++innerIndex;
+        }
+        while(innerIndex < Capacity && m_mask[innerIndex] == false);
+
+        return innerIndex;
+    }
+
+    int getFirstInnerIndex()
+    {
+        return next(-1);
+    }
+
+    T* getChildByInnerIndex(ubyte innerIndex)
+    {
+        return &m_nodes[innerIndex];
+    }
+
+    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    {
+        return innerIndex;
+    }
+}
 
     enum TypeId = NodeType.Leaf256;
     Node m_prototype = TypeId;
