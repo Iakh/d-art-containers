@@ -23,11 +23,11 @@ struct Node
 
     immutable NodeType m_type;
 
-    union
-    {
-        ubyte m_size;
-        ubyte[3] m_align;
-    }
+    ubyte m_size;
+
+    ubyte m_foldedCount;
+    enum FoldedNodesCapacity = 5;
+    ubyte[FoldedNodesCapacity] m_foldedNodes;
 
     Node* m_parent;
 }
@@ -113,16 +113,19 @@ private Node* shrinkTo(MinorNode, NodeT)(ref NodeT node)
         }
         else
         {
-            return (*new MinorNode(node[])).toNode;
+            return (*new MinorNode(node.toNode, node[])).toNode;
         }
     }
 }
 
 mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
 {
-    this(Range)(Range r)
+    this(Range)(Node* other, Range r)
     {
         size_t n;
+
+        m_foldedCount = other.m_foldedCount;
+        m_foldedNodes = other.m_foldedNodes;
 
         foreach (i, v; r)
         {
@@ -141,7 +144,7 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
         return zip(m_keys[], m_nodes[]).takeExactly(m_size);
     }
 
-    Node* addChild(MajorNode)(ubyte key, ChildT child)
+    ChildT* addChild(MajorNode)(ubyte key, Node** current)
     {
         if (m_size < Capacity)
         {
@@ -150,21 +153,19 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
             assert(m_size == 0 || m_keys[pos] != key, "Node[key] has to be free.");
 
             m_keys.insertInPlace(pos, key, m_size);
+            ChildT child;
             m_nodes.insertInPlace(pos, child, m_size);
             ++m_size;
 
-            static if (is(ChildT == Node*))
-            {
-                child.m_parent = this.toNode;
-            }
-
-            return this.toNode;
+            return &m_nodes[pos];
         }
         else
         {
-            auto newThis = new MajorNode(this[]);
+            auto newThis = new MajorNode(this.toNode, this[]);
             newThis.m_parent = m_parent;
-            return newThis.addChild!MajorNode(key, child);
+            *current = (*newThis).toNode;
+
+            return newThis.addChild!MajorNode(key, null);
         }
     }
 
@@ -257,8 +258,11 @@ struct Leaf4(T)
 
 struct Node256
 {
-    this(Range)(Range r)
+    this(Range)(Node* other, Range r)
     {
+        m_foldedCount = other.m_foldedCount;
+        m_foldedNodes = other.m_foldedNodes;
+
         foreach(i, val; r)
         {
             m_nodes[i] = val;
@@ -271,15 +275,12 @@ struct Node256
         return m_nodes[].enumerate.filter!"a[1] != null";
     }
 
-    Node* addChild(MajorNode)(ubyte key, Node* child)
+    Node** addChild(MajorNode)(ubyte key, Node** current)
     {
         assert(m_nodes[key] == null, "Node[key] has to be free.");
-
-        child.m_parent = this.toNode;
-        m_nodes[key] = child;
         ++m_size;
 
-        return this.toNode;
+        return &m_nodes[key];
     }
 
     Node** get(ubyte key)
@@ -357,8 +358,11 @@ public /+Iteration+/
 
 struct Leaf256(T)
 {
-    this(Range)(Range r)
+    this(Range)(Node* other, Range r)
     {
+        m_foldedCount = other.m_foldedCount;
+        m_foldedNodes = other.m_foldedNodes;
+
         foreach(i, val; r)
         {
             m_mask[i] = true;
@@ -372,15 +376,16 @@ struct Leaf256(T)
         return m_nodes[].enumerate.zip(m_mask[]).filter!"a[1] == true".map!"a[0]";
     }
 
-    Node* addChild(MajorNode)(ubyte key, T child)
+    T* addChild(MajorNode)(ubyte key, Node** current)
     {
         assert(m_mask[key] == false, "Node[key] has to be free.");
 
         m_mask[key] = true;
+        T child;
         m_nodes[key] = child;
         ++m_size;
 
-        return this.toNode;
+        return &m_nodes[key];
     }
 
     T* get(ubyte key)

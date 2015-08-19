@@ -8,7 +8,7 @@ import std.typetuple;
 import art.node;
 import common;
 
-struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
+private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
 {
     alias Nodes = TypeTuple!(NullNode, NodeTL.expand, NullNode);
     alias Leafs = TypeTuple!(NullNode, LeafTL.expand, NullNode);
@@ -22,12 +22,16 @@ struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
         this(Node* root)
         {
             m_node = root;
-            m_innerIndexes[0] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
-            m_keys[0] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[0]);
+            int i = depth - 1;
+            copyFoldedNodes(m_node, m_keys, i);
+            m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
+            m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[$ - 1]);
+            --i;
 
-            for (int i = 1; i < depth; ++i)
+            for (; i >= 0; --i)
             {
-                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodeTL)(m_innerIndexes[i - 1]);
+                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodeTL)(m_innerIndexes[i + 1]);
+                copyFoldedNodes(m_node, m_keys, i);
                 m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
                 m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[i]);
             }
@@ -37,20 +41,22 @@ struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
         @property
         Tuple!(ubyte[depth], T) front()
         {
-            return tuple(m_keys, *m_node.virtualCall!("getChildByInnerIndex", LeafTL)(m_innerIndexes[$ - 1]));
+            return tuple(m_keys, *m_node.virtualCall!("getChildByInnerIndex", LeafTL)(m_innerIndexes[0]));
         }
 
         void popFront()
         {
             assert(!empty, "Range should be not empty");
-            int i = depth - 1;
-            for (; i >= 0; --i)
+            int i = 0;
+            for (; i < depth; ++i)
             {
                 int innerIndex = m_innerIndexes[i];
                 innerIndex = m_node.virtualCall!("next", NodesLeafs)(innerIndex);
                 if (m_node.virtualCall!("isEnd", NodesLeafs)(innerIndex))
                 {
-                    if (i == 0)
+                    i += m_node.m_foldedCount;
+
+                    if (i == depth - 1)
                     {
                         m_node = null;
                         return;
@@ -63,10 +69,11 @@ struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
                 m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[i]);
                 break;
             }
-            ++i;
-            for (; i < depth; ++i)
+            --i;
+            for (; i >= 0; --i)
             {
-                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodeTL)(m_innerIndexes[i - 1]);
+                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodeTL)(m_innerIndexes[i + 1]);
+                copyFoldedNodes(m_node, m_keys, i);
                 m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
                 m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[i]);
             }
@@ -76,6 +83,16 @@ struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
         bool empty()
         {
             return m_node == null;
+        }
+
+        private static void copyFoldedNodes(Node* node, ref ubyte[depth] keys, ref int i)
+        {
+            for (int j = 0; j < node.m_foldedCount; ++j)
+            {
+                assert(i < depth, "i = %s, m_foldedCount = %s, type = %s".format(i, node.m_foldedCount, node.m_type));
+                keys[i] = node.m_foldedNodes[j];
+                --i;
+            }
         }
 
     private:
@@ -90,6 +107,7 @@ static:
         return RangeKeyValue();
     }
 
+    // TODO: reverse m_keys, m_innerIndexes order, remove functions that do it(just do reinterpret cast)
     ref Elem opIndex(ref Node* root, in ubyte[depth] key)
     {
         static string nodeAddSwitchBuilder()
@@ -100,26 +118,17 @@ static:
             {
                 result ~= q{
                     case Nodes[%d].TypeId:
-
                         if (auto child = (*current).toChild!(Nodes[%d]).get(key[i]))
                         {
                             current = child;
                         }
                         else
                         {
-                            Node* newChild;
-
-                            if (i == depth - 2)
-                            {
-                                newChild = (*new SmallestLeafType).toNode;
-                            }
-                            else
-                            {
-                                newChild = (*new SmallestNodeType).toNode;
-                            }
-
-                            *current = (*current).toChild!(Nodes[%d]).addChild!(Nodes[%d + 1])(key[i], newChild);
-                            current = (*current).virtualCall!("get", NodeTL)(key[i]);
+                            auto child = (*current).toChild!(Nodes[%d]).addChild!(Nodes[%d + 1])(key[i], current);
+                            parent = *current;
+                            auto t = (*current).m_type;
+                            current = child;
+                            assert(current, "key[%%s]: %%s, type: %%s".format(i, key[i], t));
                         }
                         break;
                     }.format(t, t, t, t);
@@ -142,10 +151,8 @@ static:
                         }
                         else
                         {
-                            T child;
-
-                            *current = (*current).toChild!(Leafs[%d]).addChild!(Leafs[%d + 1])(key[i], child);
-                            return *(*current).virtualCall!("get", LeafTL)(key[i]);
+                            auto child = (*current).toChild!(Leafs[%d]).addChild!(Leafs[%d + 1])(key[i], current);
+                            return *child;
                         }
                     }.format(t, t, t, t);
             }
@@ -153,15 +160,65 @@ static:
             return result;
         }
 
-        if (!root)
-        {
-            root = (*new SmallestNodeType).toNode;
-        }
-
         auto current = &root;
+        Node* parent = null;
 
-        for (int i = 0; i < depth; ++i)
+    mainLoop:
+        for (int i = depth - 1; i >= 0; --i)
         {
+            if (!*current)
+            {
+                // TODO: mixin MakeAMAPFoldedNodes
+                if (Node.FoldedNodesCapacity < i)
+                {
+                    *current = (*new SmallestNodeType).toNode;
+                }
+                else
+                {
+                    *current = (*new SmallestLeafType).toNode;
+                }
+                (*current).m_parent = parent;
+                (*current).m_foldedCount = cast(ubyte)min(Node.FoldedNodesCapacity, i);
+                foreach (j; 0 .. (*current).m_foldedCount)
+                {
+                    (*current).m_foldedNodes[j] = key[i];
+                    --i;
+                }
+            }
+            else
+            {
+                for (int j = 0; j < (*current).m_foldedCount; ++j)
+                {
+                    if ((*current).m_foldedNodes[j] == key[i])
+                    {
+                        --i;
+                    }
+                    else
+                    {
+                        auto branchyNode = new SmallestNodeType;
+                        branchyNode.m_foldedCount = cast(ubyte)j;
+                        branchyNode.m_foldedNodes[0 .. j] = (*current).m_foldedNodes[0 .. j];
+                        auto foldedLeft = (*current).m_foldedCount - j - 1; /+
+                            j folded nodes used in the branchyNode and one for the currKey
+                            +/
+                        auto currKey = (*current).m_foldedNodes[j];
+                        (*current).m_foldedNodes[0 .. foldedLeft] = (*current).m_foldedNodes[j + 1 .. (*current).m_foldedCount];
+                        (*current).m_foldedCount = cast(ubyte)foldedLeft;
+
+                        // Inserting branchyNode into the tree
+                        branchyNode.m_parent = (*current).m_parent;
+                        (*current).m_parent = (*branchyNode).toNode;
+                        *branchyNode.addChild!(Nodes[2])(currKey, null) = *current; // TODO: check SmallestNodeType capacity >= 2
+                        *current = (*branchyNode).toNode;
+                        current = branchyNode.addChild!(Nodes[2])(key[i], null); // TODO: check SmallestNodeType capacity >= 2
+
+                        // TODO: shrink(reshape) path if "old current" is one way node
+                        parent = (*branchyNode).toNode;
+                        continue mainLoop;
+                    }
+                }
+            }
+
             switch ((*current).m_type)
             {
                 mixin(nodeAddSwitchBuilder());
@@ -170,14 +227,12 @@ static:
             }
         }
 
-        assert(false);
+        assert(false, "Return should be reached in for/shwitch statements.");
     }
 
     void remove(ref Node* root, in ubyte[depth] key)
     {
-        assert(root != null, "Tree has to cantain at least one element to remove.");
-
-        remove(&root, key, 0);
+        remove(&root, key, depth - 1);
     }
 
     private void remove(Node** current, in ubyte[depth] key, size_t i)
@@ -192,7 +247,7 @@ static:
                     case Nodes[%d].TypeId:
                         auto child = (*current).toChild!(Nodes[%d]).get(key[i]);
                         assert(child != null, "Node has to be in the tree to remove");
-                        remove(child, key, i + 1);
+                        remove(child, key, i - 1);
 
                         if (*child == null)
                         {
@@ -214,12 +269,21 @@ static:
             {
                 result ~= q{
                     case Leafs[%d].TypeId:
+                        assert(i == 0, "i should be at the last (leaf) key");
                         *current = (*current).toChild!(Leafs[%d]).remove!(Leafs[%d - 1])(key[i]);
                         break;
                 }.format(t, t, t);
             }
 
             return result;
+        }
+
+        assert(current != null, "(Sub-)Tree has to cantain element to remove."); // TODO: enforce OutOfRange or etc
+
+        for (int j = 0; j < (*current).m_foldedCount; ++j)
+        {
+            assert((*current).m_foldedNodes[j] == key[i]); // TODO: enforce OutOfRange or etc
+            --i;
         }
 
         switch ((*current).m_type)
@@ -264,22 +328,27 @@ static:
             {
                 result ~= q{
                     case Leafs[%d].TypeId:
-                        if (auto result = current.toChild!(Leafs[%d]).get(key[i]))
-                        {
-                            return result;
-                        }
-                        else
-                        {
-                            return null;
-                        }
+                        auto e = current.toChild!(Leafs[%d]).get(key[i]);
+                        return e;
                 }.format(t, t);
             }
 
             return result;
         }
 
-        for (int i = 0; i < depth; ++i)
+        for (int i = depth - 1; i >= 0; --i)
         {
+            for (int j = 0; j < current.m_foldedCount; ++j)
+            {
+                if (current.m_foldedNodes[j] == key[i])
+                {
+                    --i;
+                }
+                else
+                {
+                    return null;
+                }
+            }
             switch (current.m_type)
             {
                 mixin(nodeGetSwitchBuilder());
@@ -292,7 +361,6 @@ static:
     }
 }
 
-// Fixed langth key
 struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
 {
     alias Elem = T;
@@ -351,42 +419,56 @@ private:
     alias LeafTypes = TypePack!(Leaf4!Elem, Leaf256!Elem);
 
     Node* m_root;
+
+    unittest
+    {
+        alias KeyType = size_t;
+        SparseArray!(int, KeyType, bytesUsed) arr;
+        KeyType i = 0;
+        arr[i] = 5;
+        assert(arr[i] == 5);
+
+        KeyType j = 0;
+
+        foreach (k; 0 .. 256)
+        {
+            j = k;
+            arr[j] = k;
+            assert(*(k in arr) == k, "Actual: %s, Expected: %s".format(*(k in arr), k));
+        }
+
+        foreach (k; 0 .. 256)
+        {
+            j = k * 256;
+            arr[j] = k;
+            j in arr;
+            assert(arr[j] == k, "Actual: %s, Expected: %s".format(*(j in arr), k));
+        }
+
+        foreach (size_t k; iota(0, 256, 2))
+        {
+            arr.remove(k);
+            assert((k in arr) == null);
+            assert(*(k + 1 in arr) == k + 1);
+        }
+
+        auto expected = [
+            tuple(64000, 250),
+            tuple(64256, 251),
+            tuple(64512, 252),
+            tuple(64768, 253),
+            tuple(65024, 254),
+            tuple(65280, 255)
+        ];
+
+        assert(equal(arr[].filter!"a[0] >= 64000", expected));
+    }
 }
 
 unittest
 {
-    alias KeyType = size_t;
-    SparseArray!(int, KeyType, 2) arr;
-    KeyType i = 0;
-    arr[i] = 5;
-    assert(arr[i] == 5);
-
-    KeyType j = 0;
-
-    foreach (k; 0 .. 256)
-    {
-        j = k;
-        arr[j] = k;
-        assert(*(k in arr) == k);
-    }
-
-    foreach (k; 0 .. 256)
-    {
-        j = k * 256;
-        arr[j] = k;
-        assert(arr[j] == k);
-    }
-
-    foreach (size_t k; iota(0, 256, 2))
-    {
-        arr.remove(k);
-        assert((k in arr) == null);
-        assert(*(k + 1 in arr) == k + 1);
-    }
-
-    foreach (k, v; arr[])
-    {
-        import std.stdio;
-        stderr.writeln(k, " ", v);
-    }
+    SparseArray!(int, size_t, 2) arr2;
+    SparseArray!(int, size_t, 8) arr8;
 }
+
+

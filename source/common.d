@@ -123,8 +123,8 @@ PrototypeT* toBase(PrototypeT, ChildT)(ref ChildT child)
 
 ubyte[bytesUsed] byUBytes(size_t bytesUsed, TInt)(TInt val)
 {
-    assert(bytesUsed <= TInt.sizeof);
-    assert(val < 2 ^^ (bytesUsed * 8));
+    static assert(bytesUsed <= TInt.sizeof);
+    assert(bytesUsed == TInt.sizeof || val < cast(TInt)2 ^^ (bytesUsed * 8));
 
     struct ReinterpretAsUByte
     {
@@ -138,15 +138,12 @@ ubyte[bytesUsed] byUBytes(size_t bytesUsed, TInt)(TInt val)
     ReinterpretAsUByte tmp;
     tmp.v = val;
 
-    import std.algorithm : reverse;
-    reverse(tmp.arr[]);
-
     return tmp.arr;
 }
 
 TInt ubytesTo(TInt, size_t size)(ubyte[size] val)
 {
-    assert(size <= TInt.sizeof);
+    static assert(size <= TInt.sizeof);
 
     struct ReinterpretAsUByte
     {
@@ -159,9 +156,8 @@ TInt ubytesTo(TInt, size_t size)(ubyte[size] val)
 
     ReinterpretAsUByte tmp;
 
-    import std.algorithm : reverse, copy;
+    import std.algorithm : copy;
     copy(val[], tmp.arr[]);
-    reverse(tmp.arr[]);
 
     return tmp.v;
 }

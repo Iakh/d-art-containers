@@ -1,8 +1,8 @@
 {
 	"name": "art",
-	"description": "A minimal D application.",
-	"copyright": "Copyright © 2015, eneus",
-	"authors": ["eneus"],
+	"description": "Sparse containers based on adaptive radix tree.",
+	"copyright": "Copyright © 2015, Iakh Takh",
+	"authors": ["Iakh Takh"],
 	"dependencies": {
 	}
 }
