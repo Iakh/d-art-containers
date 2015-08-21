@@ -1,5 +1,5 @@
 {
-	"name": "art",
+	"name": "d-art-containers",
 	"description": "Sparse containers based on adaptive radix tree.",
 	"copyright": "Copyright © 2015, Iakh Takh",
 	"authors": ["Iakh Takh"],

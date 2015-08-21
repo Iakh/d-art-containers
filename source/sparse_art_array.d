@@ -1,3 +1,12 @@
+/**
+This module provides an $(D SparseArray) container based on adaptive radix tree.
+
+License: Distributed under the Boost Software License, Version 1.0.
+(See accompanying file LICENSE_1_0.txt or copy at $(WEB
+boost.org/LICENSE_1_0.txt)).
+
+Authors: Iakh Takh
+*/
 import std.algorithm;
 import std.conv;
 import std.format;
@@ -361,6 +370,19 @@ static:
     }
 }
 
+/**
+SparseArray is a container based on adaptive radix tree. For each byte of the
+key there is one level of the tree nodes. So each node contains no more then
+256 children and whole tree has $(D sizeof(KeyType)) levels. There are several
+types of nodes (each defined by it's size) to save space. Each node type has
+its own strategy to manage children. Nodes with one child can be folded into
+branchy nodes. Folded(collapsed) nodes not actualy created but their keys
+saved in child nodes.
+
+Key of the element not directly stored in the tree. Key can be restored from
+the path to the node.
+
+*/
 struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
 {
     alias Elem = T;
@@ -395,21 +417,40 @@ struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
         ArrayNodeManager.RangeKeyValue m_range;
     }
 
+    /**
+    Returns a range that iterates over elements of the container, in
+    forward order.
+    Complexity: $(BIGOH bytesUsed)
+     */
     auto opIndex()
     {
         return RangeKeyValue(m_root);
     }
 
+    /**
+    Indexing operators yield or modify the value at a specified index.
+    If value not exist it will be created.
+    Complexity: $(BIGOH bytesUsed)
+     */
     ref Elem opIndex(KeyType key)
     {
         return ArrayNodeManager.opIndex(m_root, key.byUBytes!bytesUsed);
     }
 
+    /**
+    Removes the value at a specified index.
+    Complexity: $(BIGOH bytesUsed)
+     */
     void remove(ref KeyType key)
     {
         return ArrayNodeManager.remove(m_root, key.byUBytes!bytesUsed);
     }
 
+    /**
+    Returns pointer to value at a specified index. If there is no value
+    at a specified index returns $D(null)
+    Complexity: $(BIGOH bytesUsed)
+     */
     Elem* opBinaryRight(string op)(KeyType key) if (op == "in")
     {
         return ArrayNodeManager.get(m_root, key.byUBytes!bytesUsed);

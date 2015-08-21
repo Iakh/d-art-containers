@@ -1,3 +1,13 @@
+/**
+This module contains features that should be moved to other (currently not
+existing) modules.
+
+License: Distributed under the Boost Software License, Version 1.0.
+(See accompanying file LICENSE_1_0.txt or copy at $(WEB
+boost.org/LICENSE_1_0.txt)).
+
+Authors: Iakh Takh
+*/
 import std.format;
 
 template TypePack(T...)
@@ -5,6 +15,10 @@ template TypePack(T...)
     alias expand = T;
 }
 
+/**
+Safe call method of the $(D obj). Where $(obj) is pointer to prototype "base"
+struct. Field T.m_type should represent correct type of the child struct.
+*/
 auto virtualCall(string method, alias ChildrenTL, T, U...)(T* obj, U args)
 {
     alias Children = ChildrenTL.expand;
@@ -78,6 +92,9 @@ template TypeOfMember(T, string member)
     mixin("alias TypeOfMember = typeof(T."~member~");");
 }
 
+/**
+Convinient cast to child type from prototype type.
+*/
 ChildT* toChild(ChildT, PrototypeT)(PrototypeT* parent)
     if (is(PrototypeT == struct))
 {
@@ -100,6 +117,9 @@ ChildT* toChild(ChildT, PrototypeT)(PrototypeT* parent)
     mixin(toChildT!());
 }
 
+/**
+Convinient cast from prototype type to child type.
+*/
 PrototypeT* toBase(PrototypeT, ChildT)(ref ChildT child)
 {
     enum aliasThis = __traits(getAliasThis, ChildT);

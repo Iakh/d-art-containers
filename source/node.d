@@ -1,3 +1,30 @@
+/**
+This module contains implementation of nodes for adaptive radix tree
+
+Node types are in prototype based hierarchy.
+
+There are leaf types used to store elements. In general they are
+dublicating node types and in some cases can be used in same context.
+
+Hierarchy of Node types:
+-Node
+|-Nodes
+||-Node4
+||-...
+||-Node256
+|-Leafs!(T)
+ |-Leaf4!(T)
+ |-...
+ |-Leaf256!(T)
+
+But in fact there is only one parent(Node) and one level of hierarchy.
+
+License: Distributed under the Boost Software License, Version 1.0.
+(See accompanying file LICENSE_1_0.txt or copy at $(WEB
+boost.org/LICENSE_1_0.txt)).
+
+Authors: Iakh Takh
+*/
 module art.node;
 
 import std.algorithm;
@@ -14,6 +41,9 @@ Node* toNode(ChildT)(ref ChildT child)
     return toBase!Node(child);
 }
 
+/**
+$(D Node) is a base type in the hierarchy.
+*/
 struct Node
 {
     this(NodeType type)
@@ -44,12 +74,6 @@ unittest
     pnode4.m_size = 7;
 
     assert(node4.m_size == 7);
-}
-
-struct ParentChild(ChildT)
-{
-    Node* newParent;
-    ChildT* child;
 }
 
 private void insertInPlace(T, size_t N)(ref T[N] array, size_t pos, T element, size_t size)
@@ -94,6 +118,10 @@ private size_t search(T, size_t N)(ref T[N] arr, T element, size_t size)
     return max;
 }
 
+/**
+$(D NullNode) is pseudo type used in special cases and as terminating symbol in
+type lists
+*/
 struct NullNode
 {
     enum Capacity = 0;
@@ -118,6 +146,11 @@ private Node* shrinkTo(MinorNode, NodeT)(ref NodeT node)
     }
 }
 
+/**
+$(D SmallNode) is used to build node/leaf types with size from 2 to 16 elements
+
+It contains two arrays of size $(D Capacity) to save keys and children.
+*/
 mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
 {
     this(Range)(Node* other, Range r)
@@ -256,6 +289,11 @@ struct Leaf4(T)
     mixin SmallNode!(T, Capacity, TypeId);
 }
 
+/**
+$(D Node256) is the largest node type
+
+It contains two arrays of size $(D Capacity) to save keys and children.
+*/
 struct Node256
 {
     this(Range)(Node* other, Range r)
@@ -356,6 +394,12 @@ public /+Iteration+/
 
 }
 
+/**
+$(D Leaf256) is the largest leaf type
+
+It contains one array of size $(D Capacity) to save children and one to mark
+used nodes.
+*/
 struct Leaf256(T)
 {
     this(Range)(Node* other, Range r)
