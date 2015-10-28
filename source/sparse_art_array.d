@@ -117,7 +117,7 @@ static:
     }
 
     // TODO: reverse m_keys, m_innerIndexes order, remove functions that do it(just do reinterpret cast)
-    ref Elem opIndex(ref Node* root, in ubyte[depth] key)
+    ref Elem opIndexAssign(ref Node* root, const ref Elem value, in ubyte[depth] key)
     {
         static string nodeAddSwitchBuilder()
         {
@@ -156,11 +156,12 @@ static:
                     case Leafs[%d].TypeId:
                         if (auto child = (*current).toChild!(Leafs[%d]).get(key[i]))
                         {
+                            *child = value;
                             return *child;
                         }
                         else
                         {
-                            auto child = (*current).toChild!(Leafs[%d]).addChild!(Leafs[%d + 1])(key[i], current);
+                            auto child = (*current).toChild!(Leafs[%d]).addChild!(Leafs[%d + 1])(key[i], current, value);
                             return *child;
                         }
                     }.format(t, t, t, t);
@@ -382,6 +383,11 @@ saved in child nodes.
 Key of the element not directly stored in the tree. Key can be restored from
 the path to the node.
 
+Params:
+T = Type of payload.
+KeyType = Integral type used as key
+bytesUsed = Number used bytes for a key. Setting this parameter to value
+    less than KeyType.sizeof(default value) may speed up access to elements.
 */
 struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
 {
@@ -428,13 +434,31 @@ struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
     }
 
     /**
-    Indexing operators yield or modify the value at a specified index.
-    If value not exist it will be created.
+    Indexing operators yield the value at a specified index.
+    It is an error if value not exist.
     Complexity: $(BIGOH bytesUsed)
      */
     ref Elem opIndex(KeyType key)
     {
-        return ArrayNodeManager.opIndex(m_root, key.byUBytes!bytesUsed);
+        auto val = ArrayNodeManager.get(m_root, key.byUBytes!bytesUsed);
+        assert(val, "Value at specified idex should exists");
+        return *val;
+    }
+
+    /**
+    Index assign operator modify the value at a specified index.
+    If value not exist it will be created.
+    Complexity: $(BIGOH bytesUsed)
+     */
+    ref Elem opIndexAssign(const ref T value, KeyType key)
+    {
+        return ArrayNodeManager.opIndexAssign(m_root, value, key.byUBytes!bytesUsed);
+    }
+
+    ///ditto
+    ref Elem opIndexAssign(T value, KeyType key)
+    {
+        return ArrayNodeManager.opIndexAssign(m_root, value, key.byUBytes!bytesUsed);
     }
 
     /**
@@ -511,5 +535,4 @@ unittest
     SparseArray!(int, size_t, 2) arr2;
     SparseArray!(int, size_t, 8) arr8;
 }
-
 

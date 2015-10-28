@@ -76,7 +76,7 @@ unittest
     assert(node4.m_size == 7);
 }
 
-private void insertInPlace(T, size_t N)(ref T[N] array, size_t pos, T element, size_t size)
+private void insertInPlace(T, size_t N)(ref T[N] array, size_t pos, const ref T element, ubyte size)
 {
     T buffer;
 
@@ -86,7 +86,7 @@ private void insertInPlace(T, size_t N)(ref T[N] array, size_t pos, T element, s
         array[i + 1] = array[i];
     }
 
-    array[pos] = element;
+    array[pos] = cast(Node*)element;
 }
 
 private void removeElment(T, size_t N)(ref T[N] array, size_t pos, size_t size)
@@ -179,6 +179,12 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
 
     ChildT* addChild(MajorNode)(ubyte key, Node** current)
     {
+        ChildT child;
+        return addChild!(MajorNode)(key, current, child);
+    }
+
+    ChildT* addChild(MajorNode)(ubyte key, Node** current, ref const ChildT child)
+    {
         if (m_size < Capacity)
         {
             size_t pos = m_keys.search(key, m_size);
@@ -186,8 +192,7 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
             assert(m_size == 0 || m_keys[pos] != key, "Node[key] has to be free.");
 
             m_keys.insertInPlace(pos, key, m_size);
-            ChildT child;
-            m_nodes.insertInPlace(pos, child, m_size);
+            m_nodes.insertInPlace!(ChildT, Capacity)(pos, child, m_size);
             ++m_size;
 
             return &m_nodes[pos];
@@ -198,7 +203,7 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
             newThis.m_parent = m_parent;
             *current = (*newThis).toNode;
 
-            return newThis.addChild!MajorNode(key, null);
+            return newThis.addChild!MajorNode(key, null, child);
         }
     }
 
@@ -313,6 +318,12 @@ struct Node256
         return m_nodes[].enumerate.filter!"a[1] != null";
     }
 
+    Node** addChild(MajorNode)(ubyte key, Node** current, ref const Node* child)
+    {
+        assert(child == null);
+        return addChild!(MajorNode)(key, current);
+    }
+
     Node** addChild(MajorNode)(ubyte key, Node** current)
     {
         assert(m_nodes[key] == null, "Node[key] has to be free.");
@@ -420,12 +431,11 @@ struct Leaf256(T)
         return m_nodes[].enumerate.zip(m_mask[]).filter!"a[1] == true".map!"a[0]";
     }
 
-    T* addChild(MajorNode)(ubyte key, Node** current)
+    T* addChild(MajorNode)(ubyte key, Node** current, ref const T child)
     {
         assert(m_mask[key] == false, "Node[key] has to be free.");
 
         m_mask[key] = true;
-        T child;
         m_nodes[key] = child;
         ++m_size;
 
