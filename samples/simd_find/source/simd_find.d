@@ -144,24 +144,25 @@ immutable ubyte[ArraySize] arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
 void runSIMD()
 {
     static int i = 0;
-    simdIndexOf(cast(ubyte)(i++/ArraySize + 1), arr);
+    simdIndexOf(cast(ubyte)(i++ % ArraySize + 1), arr);
 }
+
 void runSTDSIMD()
 {
     static int i = 0;
-    stdSIMDIndexOf(cast(ubyte)(i++/ArraySize + 1), arr);
+    stdSIMDIndexOf(cast(ubyte)(i++ % ArraySize + 1), arr);
 }
 
 void runNaive()
 {
     static int i = 0;
-    naiveIndexOf(cast(ubyte)(i++/ArraySize + 1), arr);
+    naiveIndexOf(cast(ubyte)(i++ % ArraySize + 1), arr);
 }
 
 void runBinary()
 {
     static int i = 0;
-    binaryIndexOf(cast(ubyte)(i++/ArraySize + 1), arr);
+    binaryIndexOf(cast(ubyte)(i++ % ArraySize + 1), arr);
 }
 
 void runNothing()
