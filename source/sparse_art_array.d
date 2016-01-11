@@ -117,7 +117,7 @@ static:
     }
 
     // TODO: reverse m_keys, m_innerIndexes order, remove functions that do it(just do reinterpret cast)
-    ref Elem opIndexAssign(ref Node* root, const ref Elem value, in ubyte[depth] key)
+    ref Elem opIndexAssign()(ref Node* root, auto ref Elem value, in ubyte[depth] key)
     {
         static string nodeAddSwitchBuilder()
         {
@@ -150,7 +150,7 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Nodes.length - 1)
+            foreach (t; 1 .. Leafs.length - 1)
             {
                 result ~= q{
                     case Leafs[%d].TypeId:
@@ -275,7 +275,7 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Nodes.length - 1)
+            foreach (t; 1 .. Leafs.length - 1)
             {
                 result ~= q{
                     case Leafs[%d].TypeId:
@@ -334,7 +334,7 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Nodes.length - 1)
+            foreach (t; 1 .. Leafs.length - 1)
             {
                 result ~= q{
                     case Leafs[%d].TypeId:
@@ -450,13 +450,7 @@ struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
     If value not exist it will be created.
     Complexity: $(BIGOH bytesUsed)
      */
-    ref Elem opIndexAssign(const ref T value, KeyType key)
-    {
-        return ArrayNodeManager.opIndexAssign(m_root, value, key.byUBytes!bytesUsed);
-    }
-
-    ///ditto
-    ref Elem opIndexAssign(T value, KeyType key)
+    ref Elem opIndexAssign()(auto ref T value, KeyType key)
     {
         return ArrayNodeManager.opIndexAssign(m_root, value, key.byUBytes!bytesUsed);
     }
@@ -480,7 +474,7 @@ struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
         return ArrayNodeManager.get(m_root, key.byUBytes!bytesUsed);
     }
 private:
-    alias NodeTypes = TypePack!(Node4, Node256);
+    alias NodeTypes = TypePack!(Node4, Node48, Node256);
     alias LeafTypes = TypePack!(Leaf4!Elem, Leaf256!Elem);
 
     Node* m_root;
