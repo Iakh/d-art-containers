@@ -8,6 +8,8 @@ boost.org/LICENSE_1_0.txt)).
 
 Authors: Iakh Takh
 */
+module art.common;
+
 import std.format;
 
 template TypePack(T...)

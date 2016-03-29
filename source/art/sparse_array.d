@@ -7,6 +7,8 @@ boost.org/LICENSE_1_0.txt)).
 
 Authors: Iakh Takh
 */
+module art.sparse_array;
+
 import std.algorithm;
 import std.conv;
 import std.format;
@@ -15,7 +17,7 @@ import std.typecons;
 import std.typetuple;
 
 import art.node;
-import common;
+import art.common;
 
 private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
 {

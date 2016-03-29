@@ -1,0 +1,5 @@
+name "benchmark-with-aa"
+description "A minimal D application."
+copyright "Copyright © 2016, eneus"
+authors "eneus"
+dependency "d-art-containers" version="*"

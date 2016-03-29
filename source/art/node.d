@@ -33,7 +33,7 @@ import std.conv;
 import std.range;
 import std.typecons : Tuple, tuple;
 
-import common;
+import art.common;
 
 enum NodeType : byte {NullNode, Node4, Node16 , Node48, Node256, Leaf4, Leaf256}
 
