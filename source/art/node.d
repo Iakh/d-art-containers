@@ -187,7 +187,7 @@ mixin template SmallNode(ChildT, size_t Capacity, NodeType type)
     {
         auto pos = search(m_keys, key, m_size);
 
-        assert(m_keys[pos] != key); // TODO: Throw OutOfRange or etc.
+        assert(m_keys[pos] == key); // TODO: Throw OutOfRange or etc.
 
         removeElment(m_keys, pos, m_size);
         removeElment(m_nodes, pos, m_size);
@@ -263,7 +263,7 @@ void removeElment(T, size_t N)(ref T[N] array, size_t pos, size_t size)
     {
         moveEmplace(array[i + 1], array[i]);
     }*/
-    array[pos..size] = std.algorithm.remove(array[pos..size], 0);
+    array[pos..size - 1] = std.algorithm.remove(array[pos..size], 0);
 }
 
 size_t search(size_t N)(ref ubyte[N] arr, ubyte element, size_t size)
@@ -325,13 +325,16 @@ mixin template MediumNode(ChildT, size_t Capacity, NodeType type)
                 m_nodes = node.m_nodes.ptr;
                 m_keys = node.m_keys[];
                 m_index = 0;
-                popFront();
+
+                auto n = m_keys.countUntil!"a != b"(EmptyCell);
+                m_keys = m_keys[n .. $];
+                m_index += n;
             }
 
             @property
             Tuple!(ubyte, ChildT) front()
             {
-                return tuple(cast(ubyte)m_index, m_nodes[m_index]);
+                return tuple(cast(ubyte)m_index, m_nodes[m_keys[0]]);
             }
 
             void popFront()
@@ -346,7 +349,7 @@ mixin template MediumNode(ChildT, size_t Capacity, NodeType type)
                 }
 
                 m_keys = m_keys[n .. $];
-                m_index += n;
+                m_index += n + 1;
             }
 
             @property
