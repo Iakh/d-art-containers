@@ -387,10 +387,23 @@ mixin template MediumNode(ChildT, size_t Capacity, NodeType type)
         }
         else
         {
-            auto newThis = new MajorNode(this.toNode, this[]);
-            *current = (*newThis).toNode;
+            if (current)
+            {
+                auto newThis = new MajorNode(this.toNode, this[]);
+                *current = (*newThis).toNode;
+                return newThis.addChild!MajorNode(key, null, child);
+            }
+            else
+            {
+                /**
+                  Not reacheable. Should write "if (current)" because dmd thinks
+                  that @param current could be null here.
+                  */
 
-            return newThis.addChild!MajorNode(key, null, child);
+                // TODO: current** => ref current*
+                assert(false);
+            }
+
         }
     }
 

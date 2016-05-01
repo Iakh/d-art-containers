@@ -214,7 +214,15 @@ static:
                             j folded nodes used in the branchyNode and one for the currKey
                             +/
                         auto currKey = (*current).m_foldedNodes[j];
-                        (*current).m_foldedNodes[0 .. foldedLeft] = (*current).m_foldedNodes[j + 1 .. (*current).m_foldedCount];
+                        static void copyByByte(ubyte[] from, ubyte[] to)
+                        {
+                            for (int i = 0; i < from.length; ++i)
+                            {
+                                to[i] = from[i];
+                            }
+                        }
+                        copyByByte((*current).m_foldedNodes[j + 1 .. (*current).m_foldedCount],
+                                (*current).m_foldedNodes[0 .. foldedLeft]);
                         (*current).m_foldedCount = cast(ubyte)foldedLeft;
 
                         // Inserting branchyNode into the tree
@@ -239,7 +247,7 @@ static:
             }
         }
 
-        assert(false, "Return should be reached in for/shwitch statements.");
+        assert(false, "Return should be reached in for/switch statements.");
     }
 
     void remove(ref Node* root, in ubyte[depth] key)
