@@ -1,5 +1,6 @@
 import std.algorithm;
 import std.datetime;
+import std.json;
 import std.random;
 import std.range;
 import std.stdio;
@@ -8,9 +9,9 @@ import art.sparse_array;
 
 struct BMFunc
 {
-    this(int dataCount) @safe pure
+    this(size_t dataCount) @safe pure
     {
-        m_dataCount = dataCount;
+        m_dataCount = cast(int)dataCount;
     }
 
     void runInsertSeq(AA)()
@@ -60,9 +61,10 @@ auto normalize(T)(T t)
 {
     auto a = minPos(t[])[0];
     double[t.length] res;
+    enum double scaleFactor = 1_000_000;
     foreach (i, v; t)
     {
-        res[i] = cast(double)v.hnsecs/a.hnsecs;
+        res[i] = cast(double)v.hnsecs/scaleFactor;
 
     }
 
@@ -71,54 +73,73 @@ auto normalize(T)(T t)
 
 enum BMTimes = 5;
 
-void runInsertSeqBM()
+void saveBMResults(T)(T res, JSONValue stats)
 {
-    auto sa = () => BMFunc(1000_000).runInsertSeq!(SparseArray!(int, int));
-    auto aa = () => BMFunc(1000_000).runInsertSeq!(int[int]);
-    auto t = benchmark!(sa, aa)(BMTimes);
-    auto n = normalize(t);
-    writeln("-----");
-    writeln("SA:  ", n[0]);
-    writeln("AA:  ", n[1]);
+    auto n = normalize(res);
+
+    stats.object["ART"].array ~= JSONValue(n[0]);
+    stats.object["AA"].array ~= JSONValue(n[1]);
 }
 
-void runInsertDenseBM()
+void runInsertSeqBM(size_t dataSize, JSONValue stats)
 {
-    auto sa = () => BMFunc(1000_000).runInsertDense!(SparseArray!(int, int));
-    auto aa = () => BMFunc(1000_000).runInsertDense!(int[int]);
-    auto t = benchmark!(sa, aa)(BMTimes);
-    auto n = normalize(t);
-    writeln("-----");
-    writeln("SA:  ", n[0]);
-    writeln("AA:  ", n[1]);
+    enum size_t keySize = int.sizeof;
+    immutable size_t dataLength = dataSize / keySize;
+
+    auto art = () => BMFunc(dataLength).runInsertSeq!(SparseArray!(int, int));
+    auto aa = () => BMFunc(dataLength).runInsertSeq!(int[int]);
+
+    // Cold pass
+    auto t = benchmark!(art, aa)(BMTimes);
+
+    t = benchmark!(art, aa)(BMTimes);
+    saveBMResults(t, stats);
 }
 
-void runInsertSparseBM()
+void runInsertDenseBM(size_t dataSize, JSONValue stats)
 {
-    auto sa = () => BMFunc(1000_000).runInsertSparse!(SparseArray!(int, int));
-    auto aa = () => BMFunc(1000_000).runInsertSparse!(int[int]);
-    auto t = benchmark!(sa, aa)(BMTimes);
-    auto n = normalize(t);
-    writeln("-----");
-    writeln("SA:  ", n[0]);
-    writeln("AA:  ", n[1]);
+    enum size_t keySize = int.sizeof;
+    immutable size_t dataLength = dataSize / keySize;
+
+    auto art = () => BMFunc(dataLength).runInsertDense!(SparseArray!(int, int));
+    auto aa = () => BMFunc(dataLength).runInsertDense!(int[int]);
+
+    // Cold pass
+    auto t = benchmark!(art, aa)(BMTimes);
+
+    t = benchmark!(art, aa)(BMTimes);
+    saveBMResults(t, stats);
+}
+
+void runInsertSparseBM(size_t dataSize, JSONValue stats)
+{
+    enum size_t keySize = int.sizeof;
+    immutable size_t dataLength = dataSize / keySize;
+
+    auto art = () => BMFunc(dataLength).runInsertSparse!(SparseArray!(int, int));
+    auto aa = () => BMFunc(dataLength).runInsertSparse!(int[int]);
+
+    // Cold pass
+    auto t = benchmark!(art, aa)(BMTimes);
+
+    t = benchmark!(art, aa)(BMTimes);
+    saveBMResults(t, stats);
 }
 
 void main()
 {
-    writeln("Seq -----------");
-    foreach (i; iota(3))
+    enum size_t K = 1024;
+    enum size_t M = K * K;
+    size_t[] dataSizes = [32 * K, 256 * K, 3 * M, 16 * M];
+    JSONValue stats = parseJSON(`{"sequential":{"AA":[],"ART":[]},"dense":{"AA":[],"ART":[]},"sparse":{"AA":[],"ART":[]}}`);
+    stats.object["dataSizes"] = JSONValue(dataSizes);
+
+    foreach (size; dataSizes)
     {
-        runInsertSeqBM();
+        runInsertSeqBM(size, stats["sequential"]);
+        runInsertDenseBM(size, stats["dense"]);
+        runInsertSparseBM(size, stats["sparse"]);
     }
-    writeln("Dense----------");
-    foreach (i; iota(3))
-    {
-        runInsertDenseBM();
-    }
-    writeln("Sparse---------");
-    foreach (i; iota(3))
-    {
-        runInsertSparseBM();
-    }
+
+    writeln(stats.toString());
 }
