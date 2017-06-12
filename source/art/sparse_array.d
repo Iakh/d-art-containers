@@ -401,6 +401,9 @@ bytesUsed = Number used bytes for a key. Setting this parameter to value
 */
 struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
 {
+    alias NodeTypes = TypePack!(Node4, Node16, Node48, Node256);
+    alias LeafTypes = TypePack!(Leaf4!Elem, Leaf16!Elem, Leaf48!Elem, Leaf256!Elem);
+
     alias Elem = T;
     alias ArrayNodeManager = NodeManager!(NodeTypes, LeafTypes, Elem, bytesUsed);
 
@@ -484,9 +487,6 @@ struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
         return ArrayNodeManager.get(m_root, key.byUBytes!bytesUsed);
     }
 private:
-    alias NodeTypes = TypePack!(Node4, Node48, Node256);
-    alias LeafTypes = TypePack!(Leaf4!Elem, Leaf256!Elem);
-
     Node* m_root;
 
     unittest

@@ -35,7 +35,7 @@ import std.typecons : Tuple, tuple;
 
 import art.common;
 
-enum NodeType : byte {NullNode, Node4, Node16 , Node48, Node256, Leaf4, Leaf256}
+enum NodeType : byte {NullNode, Node4, Node16 , Node48, Node256, Leaf4, Leaf16, Leaf48, Leaf256, MRNode8, MRLeaf8}
 
 Node* toNode(ChildT)(ref ChildT child)
 {
@@ -506,6 +506,14 @@ struct Node4
     mixin SmallNode!(Node*, Capacity, TypeId);
 }
 
+struct Node16
+{
+    enum Capacity = 16;
+    enum TypeId = NodeType.Node16;
+
+    mixin SmallNode!(Node*, Capacity, TypeId);
+}
+
 struct Node48
 {
     enum Capacity = 48;
@@ -522,6 +530,21 @@ struct Leaf4(T)
     mixin SmallNode!(T, Capacity, TypeId);
 }
 
+struct Leaf16(T)
+{
+    enum Capacity = 16;
+    enum TypeId = NodeType.Leaf16;
+
+    mixin SmallNode!(T, Capacity, TypeId);
+}
+
+struct Leaf48(T)
+{
+    enum Capacity = 48;
+    enum TypeId = NodeType.Leaf48;
+
+    mixin MediumNode!(T, Capacity, TypeId);
+}
 /**
 $(D Node256) is the largest node type
 
