@@ -25,3 +25,18 @@ Also implemented sort of range over each element.
 TODO list for ranges:
  - Slices from key to key.
  - Removing element at the begin(end).
+
+Interface implementation:
+ - byUbytes/byOrderedUbytes
+   - for uints
+   - ints
+   - floats/doubles
+   - structures
+   - objects
+   - strings
+   - arrays (static and dynamic)
+
+Idea:
+    MultiRadix nodes:
+    Radix treas are slow for random insertions.
+    To improve it try to use node like SmallNode but with bigger keys (ushort, uint).
