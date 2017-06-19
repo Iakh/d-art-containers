@@ -263,18 +263,20 @@ static:
 
             foreach (t; 1 .. Nodes.length - 1)
             {
-                result ~= q{
-                    case Nodes[%d].TypeId:
-                        auto child = (*current).toChild!(Nodes[%d]).get(key[i]);
+                result ~= q{{
+                    enum t = %d;
+                    alias Node = Nodes[t];
+                    case Node.TypeId:
+                        auto child = (*current).toChild!(Node).get(key[i]);
                         assert(child != null, "Node has to be in the tree to remove");
                         remove(child, key, i - 1);
 
                         if (*child == null)
                         {
-                            *current = (*current).toChild!(Nodes[%d]).remove!(Nodes[%d - 1])(key[i]);
+                            *current = (*current).toChild!(Node).remove!(Nodes[t - 1])(key[i]);
                         }
                         break;
-                }.format(t, t, t, t);
+                }}.format(t);
 
             }
 
@@ -287,12 +289,13 @@ static:
 
             foreach (t; 1 .. Leafs.length - 1)
             {
-                result ~= q{
-                    case Leafs[%d].TypeId:
+                result ~= q{{
+                    enum t = %d;
+                    case Leafs[t].TypeId:
                         assert(i == 0, "i should be at the last (leaf) key");
-                        *current = (*current).toChild!(Leafs[%d]).remove!(Leafs[%d - 1])(key[i]);
+                        *current = (*current).toChild!(Leafs[t]).remove!(Leafs[t - 1])(key[i]);
                         break;
-                }.format(t, t, t);
+                }}.format(t);
             }
 
             return result;
@@ -322,9 +325,10 @@ static:
 
             foreach (t; 1 .. Nodes.length - 1)
             {
-                result ~= q{
-                    case Nodes[%d].TypeId:
-                        auto child = current.toChild!(Nodes[%d]).get(key[i]);
+                result ~= q{{
+                    enum t = %d;
+                    case Nodes[t].TypeId:
+                        auto child = current.toChild!(Nodes[t]).get(key[i]);
 
                         if (child == null)
                         {
@@ -333,7 +337,7 @@ static:
 
                         current = *child;
                         break;
-                }.format(t, t);
+                }}.format(t);
 
             }
 
@@ -346,11 +350,12 @@ static:
 
             foreach (t; 1 .. Leafs.length - 1)
             {
-                result ~= q{
-                    case Leafs[%d].TypeId:
-                        auto e = current.toChild!(Leafs[%d]).get(key[i]);
+                result ~= q{{
+                    enum t = %d;
+                    case Leafs[t].TypeId:
+                        auto e = current.toChild!(Leafs[t]).get(key[i]);
                         return e;
-                }.format(t, t);
+                }}.format(t);
             }
 
             return result;

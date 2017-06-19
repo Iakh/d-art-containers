@@ -18,6 +18,11 @@ template TypePack(T...)
 }
 
 /**
+TODO: Try to rewrite it with template mixin, UDA for method that could be called
+as virtual (@switch_call) and opDispatch
+mixin SwitchCall(signature, prefix, user_defined_type_info_field)
+*/
+/**
 Safe call method of the $(D obj). Where $(obj) is pointer to prototype "base"
 struct. Field T.m_type should represent correct type of the child struct.
 */
