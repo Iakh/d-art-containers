@@ -19,6 +19,36 @@ import std.typetuple;
 import art.node;
 import art.common;
 
+struct NodeTypeGraph(Elem)
+{
+    alias NodeTypes = TypePack!(Node4, Node16, Node48, Node256);
+    alias LeafTypes = TypePack!(Leaf4!Elem, Leaf16!Elem, Leaf48!Elem, Leaf256!Elem);
+
+    //template NextNode(T);
+    alias NextNode(T : NullNode) = Node4;
+    alias NextNode(T : Node4) = Node16;
+    alias NextNode(T : Node16) = Node48;
+    alias NextNode(T : Node48) = Node256;
+
+    //template PrevNode(T);
+    alias PrevNode(T : Node256) = Node48;
+    alias PrevNode(T : Node48) = Node16;
+    alias PrevNode(T : Node16) = Node4;
+    alias PrevNode(T : Node4) = NullNode;
+
+    //template NextLeaf(T);
+    alias NextLeaf(T : NullLeaf) = Leaf4!Elem;
+    alias NextLeaf(T : Leaf4!Elem) = Leaf16!Elem;
+    alias NextLeaf(T : Leaf16!Elem) = Leaf48!Elem;
+    alias NextLeaf(T : Leaf48!Elem) = Leaf256!Elem;
+
+    //template PrevLeaf(T);
+    alias PrevLeaf(T : Leaf256!Elem) = Leaf48!Elem;
+    alias PrevLeaf(T : Leaf48!Elem) = Leaf16!Elem;
+    alias PrevLeaf(T : Leaf16!Elem) = Leaf4!Elem;
+    alias PrevLeaf(T : Leaf4!Elem) = NullNode!Elem;
+}
+
 private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
 {
     alias Nodes = TypeTuple!(NullNode, NodeTL.expand, NullNode);
