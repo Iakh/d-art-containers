@@ -157,22 +157,23 @@ static:
 
             foreach (t; 1 .. Nodes.length - 1)
             {
-                result ~= q{
-                    case Nodes[%d].TypeId:
-                        if (auto child = (*current).toChild!(Nodes[%d]).get(key[i]))
+                result ~= q{{
+                    enum t = %d;
+                    case Nodes[t].TypeId:
+                        if (auto child = (*current).toChild!(Nodes[t]).get(key[i]))
                         {
                             current = child;
                         }
                         else
                         {
-                            auto child = (*current).toChild!(Nodes[%d]).addChild!(Nodes[%d + 1])(key[i], current);
+                            auto child = (*current).toChild!(Nodes[t]).addChild!(Nodes[t + 1])(key[i], current);
                             parent = *current;
-                            auto t = (*current).m_type;
+                            auto type = (*current).m_type;
                             current = child;
-                            assert(current, "key[%%s]: %%s, type: %%s".format(i, key[i], t));
+                            assert(current, "key[%%s]: %%s, type: %%s".format(i, key[i], type));
                         }
                         break;
-                    }.format(t, t, t, t);
+                }}.format(t);
             }
 
             return result;
@@ -184,19 +185,20 @@ static:
 
             foreach (t; 1 .. Leafs.length - 1)
             {
-                result ~= q{
-                    case Leafs[%d].TypeId:
-                        if (auto child = (*current).toChild!(Leafs[%d]).get(key[i]))
+                result ~= q{{
+                    enum t = %d;
+                    case Leafs[t].TypeId:
+                        if (auto child = (*current).toChild!(Leafs[t]).get(key[i]))
                         {
                             *child = value;
                             return *child;
                         }
                         else
                         {
-                            auto child = (*current).toChild!(Leafs[%d]).addChild!(Leafs[%d + 1])(key[i], current, value);
+                            auto child = (*current).toChild!(Leafs[t]).addChild!(Leafs[t + 1])(key[i], current, value);
                             return *child;
                         }
-                    }.format(t, t, t, t);
+                }}.format(t);
             }
 
             return result;
