@@ -17,6 +17,7 @@ import std.typecons;
 import std.typetuple;
 
 import art.node;
+import art.mrnode;
 import art.common;
 
 struct NodeTypeGraph(T)
@@ -53,14 +54,43 @@ struct NodeTypeGraph(T)
     alias SmallestLeafType = Leaf4!Elem;
 }
 
-private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
+struct MRNodeTypeGraph(T)
 {
-    alias Nodes = TypeTuple!(NullNode, NodeTL.expand, NullNode);
-    alias Leafs = TypeTuple!(NullNode, LeafTL.expand, NullNode);
-    alias NodesLeafs = TypePack!(NodeTL.expand, LeafTL.expand);
-    alias SmallestNodeType = Nodes[1];
-    alias SmallestLeafType = Leafs[1];
     alias Elem = T;
+    alias NodeTypes = TypeTuple!(MRNode8, Node4, Node16, Node48, Node256);
+    alias LeafTypes = TypeTuple!(MRLeaf8!Elem, Leaf4!Elem, Leaf16!Elem, Leaf48!Elem, Leaf256!Elem);
+
+    //template NextNode(T);
+    alias NextNode(T : MRNode8) = Node4;
+    alias NextNode(T : Node4) = Node16;
+    alias NextNode(T : Node16) = Node48;
+    alias NextNode(T : Node48) = Node256;
+    alias NextNode(T : Node256) = NullNode;
+
+    //template PrevNode(T);
+    alias PrevNode(T : Node256) = Node48;
+    alias PrevNode(T : Node48) = Node16;
+    alias PrevNode(T : Node16) = Node4;
+    alias PrevNode(T : Node4) = NullNode;
+    alias PrevNode(T : MRNode8) = NullNode;
+
+    //template NextLeaf(T);
+    alias NextLeaf(T : MRLeaf8!Elem) = Leaf4!Elem;
+    alias NextLeaf(T : Leaf4!Elem) = Leaf16!Elem;
+    alias NextLeaf(T : Leaf16!Elem) = Leaf48!Elem;
+    alias NextLeaf(T : Leaf48!Elem) = Leaf256!Elem;
+    alias NextLeaf(T : Leaf256!Elem) = NullNode;
+
+    //template PrevLeaf(T);
+    alias PrevLeaf(T : Leaf256!Elem) = Leaf48!Elem;
+    alias PrevLeaf(T : Leaf48!Elem) = Leaf16!Elem;
+    alias PrevLeaf(T : Leaf16!Elem) = Leaf4!Elem;
+    alias PrevLeaf(T : Leaf4!Elem) = NullNode;
+    alias PrevLeaf(T : MRLeaf8!Elem) = NullNode;
+
+    alias SmallestNodeType = Node4;
+    alias SmallestLeafType = Leaf4!Elem;
+}
 
 private struct NodeManager(alias NodeTypeGraph, size_t depth)
 {
