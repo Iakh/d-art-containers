@@ -19,16 +19,17 @@ import std.typetuple;
 import art.node;
 import art.common;
 
-struct NodeTypeGraph(Elem)
+struct NodeTypeGraph(T)
 {
-    alias NodeTypes = TypePack!(Node4, Node16, Node48, Node256);
-    alias LeafTypes = TypePack!(Leaf4!Elem, Leaf16!Elem, Leaf48!Elem, Leaf256!Elem);
+    alias Elem = T;
+    alias NodeTypes = TypeTuple!(Node4, Node16, Node48, Node256);
+    alias LeafTypes = TypeTuple!(Leaf4!Elem, Leaf16!Elem, Leaf48!Elem, Leaf256!Elem);
 
     //template NextNode(T);
-    alias NextNode(T : NullNode) = Node4;
     alias NextNode(T : Node4) = Node16;
     alias NextNode(T : Node16) = Node48;
     alias NextNode(T : Node48) = Node256;
+    alias NextNode(T : Node256) = NullNode;
 
     //template PrevNode(T);
     alias PrevNode(T : Node256) = Node48;
@@ -37,16 +38,19 @@ struct NodeTypeGraph(Elem)
     alias PrevNode(T : Node4) = NullNode;
 
     //template NextLeaf(T);
-    alias NextLeaf(T : NullLeaf) = Leaf4!Elem;
     alias NextLeaf(T : Leaf4!Elem) = Leaf16!Elem;
     alias NextLeaf(T : Leaf16!Elem) = Leaf48!Elem;
     alias NextLeaf(T : Leaf48!Elem) = Leaf256!Elem;
+    alias NextLeaf(T : Leaf256!Elem) = NullNode;
 
     //template PrevLeaf(T);
     alias PrevLeaf(T : Leaf256!Elem) = Leaf48!Elem;
     alias PrevLeaf(T : Leaf48!Elem) = Leaf16!Elem;
     alias PrevLeaf(T : Leaf16!Elem) = Leaf4!Elem;
-    alias PrevLeaf(T : Leaf4!Elem) = NullNode!Elem;
+    alias PrevLeaf(T : Leaf4!Elem) = NullNode;
+
+    alias SmallestNodeType = Node4;
+    alias SmallestLeafType = Leaf4!Elem;
 }
 
 private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
@@ -58,6 +62,17 @@ private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
     alias SmallestLeafType = Leafs[1];
     alias Elem = T;
 
+private struct NodeManager(alias NodeTypeGraph, size_t depth)
+{
+    alias Elem = NodeTypeGraph.Elem;
+    alias NodeTL = NodeTypeGraph.NodeTypes;
+    alias LeafTL = NodeTypeGraph.LeafTypes;
+    alias NodePack = TypePack!NodeTL;
+    alias LeafPack = TypePack!LeafTL;
+    alias AllNodes = TypePack!(NodeTL, LeafTL);
+    alias SmallestNodeType = NodeTypeGraph.SmallestNodeType;
+    alias SmallestLeafType = NodeTypeGraph.SmallestLeafType;
+
     struct RangeKeyValue
     {
         this(Node* root)
@@ -65,24 +80,24 @@ private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
             m_node = root;
             int i = depth - 1;
             copyFoldedNodes(m_node, m_keys, i);
-            m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
-            m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[$ - 1]);
+            m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
+            m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[$ - 1]);
             --i;
 
             for (; i >= 0; --i)
             {
-                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodeTL)(m_innerIndexes[i + 1]);
+                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodePack)(m_innerIndexes[i + 1]);
                 copyFoldedNodes(m_node, m_keys, i);
-                m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
-                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[i]);
+                m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
+                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[i]);
             }
 
         }
 
         @property
-        Tuple!(ubyte[depth], T) front()
+        Tuple!(ubyte[depth], Elem) front()
         {
-            return tuple(m_keys, *m_node.virtualCall!("getChildByInnerIndex", LeafTL)(m_innerIndexes[0]));
+            return tuple(m_keys, *m_node.virtualCall!("getChildByInnerIndex", LeafPack)(m_innerIndexes[0]));
         }
 
         void popFront()
@@ -92,8 +107,8 @@ private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
             for (; i < depth; ++i)
             {
                 int innerIndex = m_innerIndexes[i];
-                innerIndex = m_node.virtualCall!("next", NodesLeafs)(innerIndex);
-                if (m_node.virtualCall!("isEnd", NodesLeafs)(innerIndex))
+                innerIndex = m_node.virtualCall!("next", AllNodes)(innerIndex);
+                if (m_node.virtualCall!("isEnd", AllNodes)(innerIndex))
                 {
                     i += m_node.m_foldedCount;
 
@@ -107,16 +122,16 @@ private struct NodeManager(alias NodeTL, alias LeafTL, T, size_t depth)
                     continue;
                 }
                 m_innerIndexes[i] = cast(ubyte)innerIndex;
-                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[i]);
+                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[i]);
                 break;
             }
             --i;
             for (; i >= 0; --i)
             {
-                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodeTL)(m_innerIndexes[i + 1]);
+                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodePack)(m_innerIndexes[i + 1]);
                 copyFoldedNodes(m_node, m_keys, i);
-                m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", NodesLeafs)();
-                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", NodesLeafs)(m_innerIndexes[i]);
+                m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
+                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[i]);
             }
         }
 
@@ -155,18 +170,20 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Nodes.length - 1)
+            foreach (t; 0 .. NodeTL.length)
             {
                 result ~= q{{
                     enum t = %d;
-                    case Nodes[t].TypeId:
-                        if (auto child = (*current).toChild!(Nodes[t]).get(key[i]))
+                    alias NodeT = NodeTL[t];
+                    alias NextNodeT = NodeTypeGraph.NextNode!NodeT;
+                    case NodeT.TypeId:
+                        if (auto child = (*current).toChild!NodeT.get(key[i]))
                         {
                             current = child;
                         }
                         else
                         {
-                            auto child = (*current).toChild!(Nodes[t]).addChild!(Nodes[t + 1])(key[i], current);
+                            auto child = (*current).toChild!NodeT.addChild!NextNodeT(key[i], current);
                             parent = *current;
                             auto type = (*current).m_type;
                             current = child;
@@ -183,19 +200,21 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Leafs.length - 1)
+            foreach (t; 0 .. LeafTL.length)
             {
                 result ~= q{{
                     enum t = %d;
-                    case Leafs[t].TypeId:
-                        if (auto child = (*current).toChild!(Leafs[t]).get(key[i]))
+                    alias NodeT = LeafTL[t];
+                    alias NextNodeT = NodeTypeGraph.NextLeaf!NodeT;
+                    case NodeT.TypeId:
+                        if (auto child = (*current).toChild!NodeT.get(key[i]))
                         {
                             *child = value;
                             return *child;
                         }
                         else
                         {
-                            auto child = (*current).toChild!(Leafs[t]).addChild!(Leafs[t + 1])(key[i], current, value);
+                            auto child = (*current).toChild!NodeT.addChild!NextNodeT(key[i], current, value);
                             return *child;
                         }
                 }}.format(t);
@@ -260,9 +279,10 @@ static:
                         // Inserting branchyNode into the tree
                         branchyNode.m_parent = (*current).m_parent;
                         (*current).m_parent = (*branchyNode).toNode;
-                        *branchyNode.addChild!(Nodes[2])(currKey, null) = *current; // TODO: check SmallestNodeType capacity >= 2
+                        alias SecondSmallestNode = NodeTypeGraph.NextNode!SmallestNodeType;
+                        *branchyNode.addChild!SecondSmallestNode(currKey, null) = *current; // TODO: check SmallestNodeType capacity >= 2
                         *current = (*branchyNode).toNode;
-                        current = branchyNode.addChild!(Nodes[2])(key[i], null); // TODO: check SmallestNodeType capacity >= 2
+                        current = branchyNode.addChild!SecondSmallestNode(key[i], null); // TODO: check SmallestNodeType capacity >= 2
 
                         // TODO: shrink(reshape) path if "old current" is one way node
                         parent = (*branchyNode).toNode;
@@ -293,19 +313,20 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Nodes.length - 1)
+            foreach (t; 0 .. NodeTL.length)
             {
                 result ~= q{{
                     enum t = %d;
-                    alias Node = Nodes[t];
-                    case Node.TypeId:
-                        auto child = (*current).toChild!(Node).get(key[i]);
+                    alias NodeT = NodeTL[t];
+                    alias PrevNodeT = NodeTypeGraph.PrevNode!NodeT;
+                    case NodeT.TypeId:
+                        auto child = (*current).toChild!NodeT.get(key[i]);
                         assert(child != null, "Node has to be in the tree to remove");
                         remove(child, key, i - 1);
 
                         if (*child == null)
                         {
-                            *current = (*current).toChild!(Node).remove!(Nodes[t - 1])(key[i]);
+                            *current = (*current).toChild!NodeT.remove!PrevNodeT(key[i]);
                         }
                         break;
                 }}.format(t);
@@ -319,13 +340,15 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Leafs.length - 1)
+            foreach (t; 0 .. LeafTL.length)
             {
                 result ~= q{{
                     enum t = %d;
-                    case Leafs[t].TypeId:
+                    alias NodeT = LeafTL[t];
+                    alias PrevNodeT = NodeTypeGraph.PrevLeaf!NodeT;
+                    case NodeT.TypeId:
                         assert(i == 0, "i should be at the last (leaf) key");
-                        *current = (*current).toChild!(Leafs[t]).remove!(Leafs[t - 1])(key[i]);
+                        *current = (*current).toChild!NodeT.remove!PrevNodeT(key[i]);
                         break;
                 }}.format(t);
             }
@@ -355,12 +378,13 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Nodes.length - 1)
+            foreach (t; 0 .. NodeTL.length)
             {
                 result ~= q{{
                     enum t = %d;
-                    case Nodes[t].TypeId:
-                        auto child = current.toChild!(Nodes[t]).get(key[i]);
+                    alias NodeT = NodeTL[t];
+                    case NodeT.TypeId:
+                        auto child = current.toChild!NodeT.get(key[i]);
 
                         if (child == null)
                         {
@@ -380,12 +404,13 @@ static:
         {
             string result = "";
 
-            foreach (t; 1 .. Leafs.length - 1)
+            foreach (t; 0 .. LeafTL.length)
             {
                 result ~= q{{
                     enum t = %d;
-                    case Leafs[t].TypeId:
-                        auto e = current.toChild!(Leafs[t]).get(key[i]);
+                    alias NodeT = LeafTL[t];
+                    case NodeT.TypeId:
+                        auto e = current.toChild!NodeT.get(key[i]);
                         return e;
                 }}.format(t);
             }
@@ -442,7 +467,7 @@ struct SparseArray(T, KeyType = size_t, size_t bytesUsed = KeyType.sizeof)
     alias LeafTypes = TypePack!(Leaf4!Elem, Leaf16!Elem, Leaf48!Elem, Leaf256!Elem);
 
     alias Elem = T;
-    alias ArrayNodeManager = NodeManager!(NodeTypes, LeafTypes, Elem, bytesUsed);
+    alias ArrayNodeManager = NodeManager!(NodeTypeGraph!Elem, bytesUsed);
 
     struct RangeKeyValue
     {

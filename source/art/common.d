@@ -252,8 +252,8 @@ struct StaticBitArray(size_t Size)
     {
         assert(n >= 0 && n < Size); // TODO: throw OutOfRange
         ulong i = (n >> 3);
-        byte bit = cast(byte)(1 << (n & 0b111));
-        byte x = value;
+        int bit = 1 << (n & 0b111);
+        int x = value;
 
         m_bytes[i] ^= (-x ^ m_bytes[i]) & bit;
     }
