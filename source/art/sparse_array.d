@@ -107,19 +107,20 @@ private struct NodeManager(alias NodeTypeGraph, size_t depth)
     {
         this(Node* root)
         {
+            m_depth = 0;
             m_node = root;
             int i = depth - 1;
             copyFoldedNodes(m_node, m_keys, i);
-            m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
-            m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[$ - 1]);
-            --i;
+            m_innerIndexes[m_depth] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
+            i -= m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[m_depth], m_keys, i);
 
-            for (; i >= 0; --i)
+            for (; i >= 0;)
             {
-                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodePack)(m_innerIndexes[i + 1]);
+                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodePack)(m_innerIndexes[m_depth]);
+                ++m_depth;
                 copyFoldedNodes(m_node, m_keys, i);
                 m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
-                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[i]);
+                i -= m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[m_depth], m_keys, i);
             }
 
         }
@@ -127,41 +128,50 @@ private struct NodeManager(alias NodeTypeGraph, size_t depth)
         @property
         Tuple!(ubyte[depth], Elem) front()
         {
-            return tuple(m_keys, *m_node.virtualCall!("getChildByInnerIndex", LeafPack)(m_innerIndexes[0]));
+            return tuple(m_keys, *m_node.virtualCall!("getChildByInnerIndex", LeafPack)(m_innerIndexes[m_depth]));
         }
 
         void popFront()
         {
             assert(!empty, "Range should be not empty");
-            int i = 0;
-            for (; i < depth; ++i)
+
+            int i = m_node.virtualCall!("radixSize", AllNodes)() - 1;
+
+            for (;;)
             {
-                int innerIndex = m_innerIndexes[i];
+                int innerIndex = m_innerIndexes[m_depth];
                 innerIndex = m_node.virtualCall!("next", AllNodes)(innerIndex);
-                if (m_node.virtualCall!("isEnd", AllNodes)(innerIndex))
+
+                if (!m_node.virtualCall!("isEnd", AllNodes)(innerIndex))
                 {
-                    i += m_node.m_foldedCount;
-
-                    if (i == depth - 1)
-                    {
-                        m_node = null;
-                        return;
-                    }
-
-                    m_node = m_node.m_parent;
-                    continue;
+                    m_innerIndexes[m_depth] = cast(ubyte)innerIndex;
+                    break;
                 }
-                m_innerIndexes[i] = cast(ubyte)innerIndex;
-                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[i]);
-                break;
+
+                i += m_node.m_foldedCount;
+
+                if (m_depth == 0)
+                {
+                    m_node = null;
+                    m_depth = -1;
+                    return;
+                }
+
+                m_node = m_node.m_parent;
+                i += m_node.virtualCall!("radixSize", AllNodes)();
+                --m_depth;
             }
-            --i;
-            for (; i >= 0; --i)
+
+            i -= m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[m_depth], m_keys, i);
+
+            for (; i >= 0;)
             {
-                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodePack)(m_innerIndexes[i + 1]);
+                m_node = *m_node.virtualCall!("getChildByInnerIndex", NodePack)(m_innerIndexes[m_depth]);
+                ++m_depth;
+                m_innerIndexes[m_depth] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
+
                 copyFoldedNodes(m_node, m_keys, i);
-                m_innerIndexes[i] = cast(ubyte)m_node.virtualCall!("getFirstInnerIndex", AllNodes)();
-                m_keys[i] =  m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[i]);
+                i -= m_node.virtualCall!("getKeyByInnerIndex", AllNodes)(m_innerIndexes[m_depth], m_keys, i);
             }
         }
 
@@ -183,6 +193,7 @@ private struct NodeManager(alias NodeTypeGraph, size_t depth)
 
     private:
         Node* m_node;
+        int m_depth;
         ubyte[depth] m_keys;
         ubyte[depth] m_innerIndexes;
     }
@@ -625,6 +636,8 @@ private:
         assert(equal(arr[].filter!"a[0] >= 64000", expected));
     }
 }
+
+alias ArrayMRNodeManager = NodeManager!(MRNodeTypeGraph!int, int.sizeof);
 
 unittest
 {

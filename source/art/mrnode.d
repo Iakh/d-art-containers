@@ -16,6 +16,7 @@ import std.range;
 import std.typecons : Tuple, tuple;
 
 import art.common;
+import art.byubyte;
 import art.node;
 
 template MRNodeDataTemplate()
@@ -150,6 +151,22 @@ public /+Iteration+/
     {
         return m_keys[innerIndex];
     }
+
+    int getKeyByInnerIndex(ubyte innerIndex, ubyte[] keys, int i)
+    {
+        ubyte[Radix.sizeof] arr = m_keys[innerIndex].byUbytes!Radix.sizeof;
+        for (int j = 0; j < Radix.sizeof; ++j)
+        {
+            keys[i] = arr[j];
+            --i;
+        }
+        return Radix.sizeof;
+    }
+
+    int radixSize()
+    {
+        return Radix.sizeof;
+    }
 }
 
     alias Radix = MRNodeData.Radix;
@@ -161,6 +178,7 @@ public /+Iteration+/
     Radix[Capacity] m_keys = [Radix.max];
     ChildT[Capacity] m_nodes;
 
+    enum TypeId = MRNodeData.TypeId;
 private static:
     void insertInPlace(T, size_t N)(ref T[N] array, size_t pos, auto ref T element, ubyte size)
     {

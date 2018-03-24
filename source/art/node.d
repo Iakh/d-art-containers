@@ -94,7 +94,7 @@ struct NullNode
     enum Capacity = 0;
 }
 
-private Node* shrinkTo(MinorNode, NodeT)(ref NodeT node)
+package Node* shrinkTo(MinorNode, NodeT)(ref NodeT node)
 {
     if (node.m_size > MinorNode.Capacity)
     {
@@ -229,9 +229,15 @@ public /+Iteration+/
         return &m_nodes[innerIndex];
     }
 
-    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    int getKeyByInnerIndex(ubyte innerIndex, ubyte[] keys, int i)
     {
-        return m_keys[innerIndex];
+        keys[i] = m_keys[innerIndex];
+        return 1;
+    }
+
+    int radixSize()
+    {
+        return 1;
     }
 }
 
@@ -464,9 +470,15 @@ public /+Iteration+/
         return &m_nodes[m_keys[innerIndex]];
     }
 
-    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    int getKeyByInnerIndex(ubyte innerIndex, ubyte[] keys, int i)
     {
-        return innerIndex;
+        keys[i] = innerIndex;
+        return 1;
+    }
+
+    int radixSize()
+    {
+        return 1;
     }
 
     static int indexOfNotEmpty(ref ubyte[Radix] arr, int startIndex)
@@ -640,9 +652,15 @@ public /+Iteration+/
         return &m_nodes[innerIndex];
     }
 
-    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    int getKeyByInnerIndex(ubyte innerIndex, ubyte[] keys, int i)
     {
-        return innerIndex;
+        keys[i] = innerIndex;
+        return 1;
+    }
+
+    int radixSize()
+    {
+        return 1;
     }
 }
 
@@ -749,9 +767,15 @@ public /+Iteration+/
         return &m_nodes[innerIndex];
     }
 
-    ubyte getKeyByInnerIndex(ubyte innerIndex)
+    int getKeyByInnerIndex(ubyte innerIndex, ubyte[] keys, int i)
     {
-        return innerIndex;
+        keys[i] = innerIndex;
+        return 1;
+    }
+
+    int radixSize()
+    {
+        return 1;
     }
 }
 
