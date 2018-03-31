@@ -26,7 +26,7 @@ mixin SwitchCall(signature, prefix, user_defined_type_info_field)
 Safe call method of the $(D obj). Where $(obj) is pointer to prototype "base"
 struct. Field T.m_type should represent correct type of the child struct.
 */
-auto virtualCall(string method, alias ChildrenTL, T, U...)(T* obj, U args)
+auto virtualCall(string method, alias ChildrenTL, T, U...)(T* obj, auto ref U args)
 {
     alias Children = ChildrenTL.expand;
 
